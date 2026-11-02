@@ -1,0 +1,433 @@
+# JobPoll watchlist. User-editable; contains no secrets, so the repo can be
+# public. Adding a company of an existing type = one entry under `sources:`.
+#
+# Migration trap: before adding a company, confirm its Apply links actually
+# point at that ATS. A board a company migrated away from returns 200 with
+# zero jobs forever (e.g. deel and kraken have empty abandoned boards;
+# mercury and plaid moved ATSes, so their OLD boards are empty - the live
+# greenhouse/ashby ones are what's on the list below). Probe first:
+#   ashby:      https://api.ashbyhq.com/posting-api/job-board/{company}
+#   greenhouse: https://boards-api.greenhouse.io/v1/boards/{company}/jobs
+#   lever:      https://api.lever.co/v0/postings/{company}?mode=json
+#   workday:    POST https://{company}.{instance}.myworkdayjobs.com/wday/cxs/{company}/{site}/jobs
+#               body {"appliedFacets":{},"limit":20,"offset":0,"searchText":""}
+#   ultipro:    POST https://{host}/{tenant}/JobBoard/{board}/JobBoardView/LoadSearchResults
+#               body {"opportunitySearch":{"Top":10,"Skip":0,"QueryString":"","OrderBy":
+#               [{"Value":"postedDateDesc","PropertyName":"PostedDate","Ascending":false}],
+#               "Filters":[]},"matchCriteria":{"PreferredJobs":[],"Educations":[],
+#               "LicenseAndCertifications":[],"Skills":[],"hasNoLicenses":false,"SkippedSkills":[]}}
+#
+# UltiPro (UKG Pro Recruiting) needs three values, all readable off the board
+# URL: for https://recruiting.ultipro.ca/PAS5000PASON/JobBoard/736c1025-.../
+# the entry is host: recruiting.ultipro.ca / tenant: PAS5000PASON /
+# board: 736c1025-... (the GUID). host defaults to recruiting.ultipro.com.
+#
+# Workday needs three values, all readable off the board URL: for
+# https://nvidia.wd5.myworkdayjobs.com/NVIDIAExternalCareerSite the entry is
+# company: nvidia / instance: wd5 / site: NVIDIAExternalCareerSite. The
+# adapter fetches only the newest ~60 postings per poll (boards hold
+# thousands), which the 5-minute cadence makes lossless.
+#
+# Slug collision trap: a live board can belong to a different company than
+# the name suggests (ashby "runway" is Runway Financial, not Runway ML;
+# "warp" is Warp the payroll startup, not warp.dev). After probing, read a
+# couple of job titles to confirm it is the company you meant.
+#
+# FAANG+ run custom career sites with no public board API. Amazon, Google,
+# Microsoft, Apple, Netflix, Rivian, Uber, and Shopify have dedicated
+# adapters that scrape whatever their own search UI is backed by - JSON
+# APIs for most, server-rendered HTML for Apple, and for Shopify a
+# hand-written decoder for the bespoke flattened-object-graph format its
+# React Router loader data ships as (see shopify.py for the full story;
+# it is NOT the open-source turbo-stream format despite looking similar).
+# Meta is not covered by anything: it blocks every non-browser client (its
+# GraphQL, sitemap, and even robots.txt reject plain HTTP clients), and its
+# robots.txt explicitly prohibits automated collection ("Collection of data
+# on Facebook through automated means is prohibited unless you have express
+# written permission") - so this isn't just a technical wall, don't route
+# around it via a proxy/headless-browser trick. Tesla is similarly out: its
+# careers site sits behind bot-mitigation (obfuscated endpoints, outright
+# 403s to plain HTTP clients) that would require solving a JS challenge to
+# get past.
+
+sources:
+  # --- fintech ---
+  - type: ashby
+    company: wealthsimple
+  - type: ashby
+    company: ramp
+  - type: ashby
+    company: column
+  - type: greenhouse
+    company: stripe
+  - type: greenhouse
+    company: coinbase
+  - type: greenhouse
+    company: robinhood
+  - type: greenhouse
+    company: affirm
+  - type: greenhouse
+    company: chime
+  - type: greenhouse
+    company: brex
+  - type: greenhouse
+    company: adyen
+  - type: greenhouse
+    company: block
+  - {type: greenhouse, company: mercury}  # live board; the abandoned one was ashby
+  - {type: ashby, company: plaid}  # live board; the abandoned one was lever
+  - {type: greenhouse, company: gusto}
+  - {type: greenhouse, company: tripactions}  # Navan, still on its legacy slug
+  - {type: ashby, company: airwallex}
+  - {type: greenhouse, company: marqeta}
+  - {type: ashby, company: moderntreasury}
+  - {type: greenhouse, company: lithic}
+  - {type: ashby, company: koho}
+  - {type: ashby, company: neofinancial}
+  - {type: ashby, company: float}  # Float Financial (Canadian corporate cards)
+
+  # --- tech ---
+  - type: ashby
+    company: openai
+  - type: ashby
+    company: linear
+  - type: ashby
+    company: cursor
+  - type: ashby
+    company: notion
+  - type: ashby
+    company: perplexity
+  - type: ashby
+    company: cohere
+  - type: ashby
+    company: sierra
+  - type: ashby
+    company: elevenlabs
+  - type: ashby
+    company: harvey
+  - type: ashby
+    company: cognition
+  - type: ashby
+    company: decagon
+  - type: ashby
+    company: replit
+  - type: ashby
+    company: supabase
+  - type: ashby
+    company: posthog
+  - type: ashby
+    company: vanta
+  - type: ashby
+    company: modal
+  - type: ashby
+    company: temporal
+  - type: ashby
+    company: docker
+  - type: ashby
+    company: render
+  - type: ashby
+    company: lambda
+  - type: greenhouse
+    company: anthropic
+  - type: greenhouse
+    company: databricks
+  - type: greenhouse
+    company: figma
+  - type: greenhouse
+    company: vercel
+  - type: greenhouse
+    company: duolingo
+  - type: lever
+    company: palantir
+
+  # --- AI ---
+  - {type: greenhouse, company: xai}
+  - {type: greenhouse, company: scaleai}
+  - {type: ashby, company: mistral.ai}  # Montreal office; old lever "mistral" is abandoned
+  - {type: greenhouse, company: togetherai}
+  - {type: ashby, company: cerebras}
+  - {type: ashby, company: anyscale}
+  - {type: ashby, company: langchain}
+  - {type: ashby, company: pinecone}
+  - {type: greenhouse, company: gleanwork}
+  - {type: greenhouse, company: sourcegraph91}
+  - {type: ashby, company: character}
+  - {type: ashby, company: writer}
+  - {type: ashby, company: abridge}
+  - {type: ashby, company: openevidence}
+  - {type: ashby, company: ideogram}  # all-Toronto
+  - {type: ashby, company: runway-ml}  # the AI video co; ashby "runway" is Runway Financial
+  - {type: greenhouse, company: coreweave}  # Weights & Biases hiring folded in here
+  - {type: ashby, company: fireworks}
+  - {type: ashby, company: baseten}
+
+  # --- dev tools & infra ---
+  - {type: greenhouse, company: gitlab}
+  - {type: greenhouse, company: grafanalabs}
+  - {type: ashby, company: railway}
+  - {type: greenhouse, company: planetscale}
+  - {type: ashby, company: workos}
+  - {type: ashby, company: airbyte}
+  - {type: ashby, company: astronomer}
+  - {type: ashby, company: zed}
+  - {type: greenhouse, company: postman}
+  - {type: greenhouse, company: wizinc}
+  - {type: greenhouse, company: chainguard}
+  - {type: greenhouse, company: tailscale}  # Toronto HQ
+  - {type: ashby, company: 1password}
+  - {type: ashby, company: sentry}
+  - {type: greenhouse, company: launchdarkly}
+  - {type: greenhouse, company: circleci}
+  - {type: greenhouse, company: buildkite}
+  - {type: greenhouse, company: warp}  # warp.dev the terminal; ashby "warp" is a payroll startup
+  - {type: ashby, company: zapier}
+  - {type: greenhouse, company: fivetran}  # dbt Labs merged in; old dbtlabsinc board is dead
+  - {type: greenhouse, company: cockroachlabs}
+  - {type: ashby, company: confluent}
+  - {type: ashby, company: snowflake}
+  - {type: ashby, company: benchling}
+  - {type: greenhouse, company: jetbrains}
+  - {type: greenhouse, company: verkada}
+  - {type: greenhouse, company: samsara}
+
+  # --- consumer & SaaS ---
+  - {type: greenhouse, company: airtable}
+  - {type: greenhouse, company: asana}
+  - {type: greenhouse, company: discord}
+  - {type: greenhouse, company: reddit}
+  - {type: greenhouse, company: pinterest}
+  - {type: greenhouse, company: instacart}
+  - {type: greenhouse, company: doordashusa}
+  - {type: greenhouse, company: lyft}
+  - {type: greenhouse, company: airbnb}
+  - {type: greenhouse, company: dropbox}
+  - {type: greenhouse, company: twitch}
+  - {type: greenhouse, company: roblox}
+  - {type: lever, company: spotify}
+  - {type: greenhouse, company: mongodb}
+  - {type: greenhouse, company: elastic}
+  - {type: greenhouse, company: cloudflare}
+  - {type: greenhouse, company: datadog}
+  - {type: greenhouse, company: twilio}
+  - {type: greenhouse, company: okta}
+  - {type: greenhouse, company: flexport}
+  - {type: greenhouse, company: amplitude}
+  - {type: greenhouse, company: mixpanel}
+  - {type: greenhouse, company: webflow}
+  - {type: greenhouse, company: squarespace}
+  - {type: greenhouse, company: intercom}
+  - {type: ashby, company: miro}
+  - {type: ashby, company: "Superhuman Platform Inc"}  # Grammarly's rebrand; slug really has spaces
+
+  # --- Canadian tech ---
+  - {type: greenhouse, company: faire}
+  - {type: ashby, company: jobber}
+  - {type: greenhouse, company: thinkific}
+  - {type: greenhouse, company: d2l}  # lever "d2l" is a different SF company
+  - {type: greenhouse, company: hootsuite}
+  - {type: ashby, company: klue}
+  - {type: lever, company: waveapps}
+  - {type: greenhouse, company: leagueinc}
+  - {type: greenhouse, company: tenstorrent}
+  - {type: lever, company: waabi}
+  - {type: greenhouse, company: alayacare}
+  - {type: ashby, company: benevity}
+  - {type: greenhouse, company: ada18}  # Ada (ada.cx)
+  - {type: ashby, company: top-hat}
+  - {type: ashby, company: lightspeedhq}  # ashby "lightspeed" is an Illinois robotics co
+  - {type: greenhouse, company: coveoen}
+  - {type: greenhouse, company: 7shifts}
+  - {type: ashby, company: trulioo}
+  - {type: greenhouse, company: tucows}
+  - {type: ashby, company: hopper}  # Montreal/Toronto/Vancouver
+
+  # --- fintech & banks on Workday ---
+  - {type: workday, company: paypal, instance: wd1, site: jobs}
+  - {type: workday, company: mastercard, instance: wd1, site: CorporateCareers}
+  - {type: workday, company: visa, instance: wd5, site: Visa}
+  - {type: workday, company: capitalone, instance: wd12, site: Capital_One}
+  - {type: workday, company: blackrock, instance: wd1, site: BlackRock_Professional}
+  - {type: workday, company: fmr, instance: wd1, site: fidelitycareers}  # Fidelity
+  - {type: workday, company: ms, instance: wd5, site: External}  # Morgan Stanley
+  - {type: workday, company: citi, instance: wd5, site: "2"}
+  - {type: workday, company: statestreet, instance: wd1, site: Global}
+  - {type: workday, company: nasdaq, instance: wd1, site: Global_External_Site}
+  - {type: workday, company: fis, instance: wd5, site: searchjobs}
+  - {type: workday, company: fiserv, instance: wd5, site: ext}
+  - {type: workday, company: tsys, instance: wd1, site: TSYS}  # Global Payments
+  - {type: workday, company: spgi, instance: wd5, site: SPGI_Careers}  # S&P Global
+  - {type: workday, company: interac, instance: wd3, site: Interac}
+  - {type: workday, company: rbc, instance: wd3, site: rbcglobal1}
+  - {type: workday, company: td, instance: wd3, site: TD_Bank_Careers}
+  - {type: workday, company: bmo, instance: wd3, site: External}
+  - {type: workday, company: cibc, instance: wd3, site: search}
+
+  # --- big tech on Workday ---
+  - {type: workday, company: nvidia, instance: wd5, site: NVIDIAExternalCareerSite}
+  - {type: workday, company: salesforce, instance: wd12, site: External_Career_Site}
+  - {type: workday, company: adobe, instance: wd5, site: external_experienced}
+  - {type: workday, company: intel, instance: wd1, site: external}
+  - {type: workday, company: hp, instance: wd5, site: ExternalCareerSite}
+  - {type: workday, company: hpe, instance: wd5, site: Jobsathpe}
+  - {type: workday, company: ebay, instance: wd5, site: apply}
+  - {type: workday, company: broadcom, instance: wd1, site: external_career}
+  - {type: workday, company: micron, instance: wd1, site: External}
+  - {type: workday, company: analogdevices, instance: wd1, site: External}
+  - {type: workday, company: cadence, instance: wd1, site: Univ_Careers}
+  - {type: workday, company: autodesk, instance: wd1, site: Ext}
+  - {type: workday, company: workday, instance: wd5, site: Workday}
+  - {type: workday, company: zoom, instance: wd5, site: Zoom}
+  - {type: workday, company: redhat, instance: wd5, site: jobs}
+  - {type: workday, company: paloaltonetworks, instance: wd5, site: panwexternalcareers}
+  - {type: workday, company: crowdstrike, instance: wd5, site: crowdstrikecareers}
+  - {type: workday, company: sonyglobal, instance: wd1, site: SonyGlobalCareers}
+  - {type: workday, company: motorolasolutions, instance: wd5, site: Careers}
+  - {type: workday, company: sec, instance: wd3, site: Samsung_Careers}  # Samsung
+
+  # --- more tech & Canadian enterprises on Workday ---
+  - {type: workday, company: snapchat, instance: wd1, site: snap}  # Snap, Toronto eng
+  - {type: workday, company: snyk, instance: wd103, site: External}
+  - {type: workday, company: clio, instance: wd3, site: ClioCareerSite}  # Vancouver/Toronto/Calgary
+  - {type: workday, company: applyboard, instance: wd3, site: ApplyBoardNH}  # Kitchener
+  - {type: workday, company: trendmicro, instance: wd3, site: External}  # big Ottawa office
+  - {type: workday, company: ciena, instance: wd5, site: Careers}  # Ottawa
+  - {type: workday, company: bb, instance: wd3, site: BlackBerry}  # BlackBerry/QNX, Waterloo+Ottawa
+  - {type: workday, company: mitel, instance: wd3, site: mitelcareers}  # Ottawa
+  - {type: workday, company: cae, instance: wd3, site: career}  # Montreal
+  - {type: workday, company: thomsonreuters, instance: wd5, site: External_Career_Site}  # Toronto
+  - {type: workday, company: sunlife, instance: wd3, site: Experienced-Jobs}
+  - {type: workday, company: manulife, instance: wd3, site: MFCJH_Jobs}
+  - {type: workday, company: ssctech, instance: wd1, site: SSCTechnologies}  # SS&C, Toronto
+  - {type: workday, company: broadridge, instance: wd5, site: Careers}
+  - {type: workday, company: intactfc, instance: wd3, site: intactfc}
+  - {type: workday, company: canadiantirecorporation, instance: wd3, site: Enterprise_External_Careers_Site}
+  - {type: workday, company: telusinternational, instance: wd3, site: External}  # Telus Digital
+  - {type: workday, company: marvell, instance: wd1, site: MarvellCareers2}
+  - {type: workday, company: workiva, instance: wd503, site: careers}  # nonstandard wd503 instance
+
+  # --- energy tech on UltiPro ---
+  - {type: ultipro, company: pason, host: recruiting.ultipro.ca,
+     tenant: PAS5000PASON, board: 736c1025-c469-4ece-a487-4884545272a7}
+  # MDA Space (Brampton/Montreal/Richmond BC) splits postings across boards
+  # under one tenant; the students board carries the co-op/intern roles.
+  - {type: ultipro, company: mda, host: recruiting.ultipro.ca,
+     tenant: MAC5000MCDW, board: 4f9bafdd-9002-4e06-975a-bcaae5edaf84}
+  - {type: ultipro, company: mda-students, host: recruiting.ultipro.ca,
+     tenant: MAC5000MCDW, board: 7667adcc-47ae-477a-9183-0d8ef8bc0748}
+
+  # --- custom career sites (scraped via the JSON, or for Apple the SSR
+  # HTML, behind their own search UI) ---
+  # All fetch enough per poll that the 5-minute cadence is lossless. The
+  # `name` key labels the source; the country / location keys filter
+  # server-side to match the Canada-only watchlist. Rivian, Uber, and
+  # Shopify aren't sorted/filterable server-side (Shopify has no location
+  # filter at all - it always returns the whole company board), but Canada
+  # job volume for all three is low enough that fetching everything each
+  # poll is cheap and never-miss regardless of order.
+  - {type: amazon, name: canada, country: CAN}
+  - {type: google, name: canada, location: Canada}
+  - {type: microsoft, name: canada, location: Canada}
+  - {type: apple, name: canada, location: canada-CANC}
+  - {type: netflix, name: canada, location: Canada}
+  - {type: rivian, name: canada, location: Canada}
+  - {type: uber, name: canada, country: Canada}
+  - {type: shopify, name: canada}
+
+  # --- cross-company aggregators (cover FAANG and hundreds more) ---
+  # - type: github
+  #   repo: SimplifyJobs/New-Grad-Positions
+  #   path: .github/scripts/listings.json
+  #   branch: dev
+  # - type: github
+  #   repo: SimplifyJobs/Summer2026-Internships
+  #   path: .github/scripts/listings.json
+  #   branch: dev
+
+# Filters target graduate / junior software roles (SWE, full stack, backend,
+# platform, SRE, forward deployed) plus internships. Matching is
+# case-insensitive SUBSTRING on the title - keywords like "sr " use spacing
+# on purpose so they don't swallow "SRE".
+filters:
+  # "intern" also covers "internship" by substring; accepted false positives:
+  # non-engineering "Internal ..." / "International ..." titles that survive
+  # the exclusion list (e.g. "Internal Auditor"). "co-op" and "coop" are both
+  # needed because boards spell it either way.
+  include_keywords: [engineer, developer, software, intern, co-op, coop, ML, FDE, Forward Deployed Engineer, AI]
+  exclude_keywords:
+    - senior
+    - "sr."
+    - "sr "
+    - staff
+    - principal
+    - distinguished
+    - architect
+    - lead
+    - manager
+    - director
+    - "head of"
+    - "vp "
+  # Keep only Canada postings. Matching is case-insensitive SUBSTRING on the
+  # location, so every term below was checked against real location strings
+  # from the current sources before being added. Almost every Canadian
+  # posting says "... Canada" or uses a ", XX" province code; city names
+  # cover the SimplifyJobs shorthands ("Toronto", "NYC, Toronto, Remote in
+  # Canada"). Substring traps to keep in mind when editing:
+  #   - never add bare "us" (matches Australia), "markham" (Markham, IL),
+  #     "surrey" or "halifax" or "victoria" (Surrey/Halifax UK, Victoria
+  #     AUS), or ", ns" (matches "Sydney, NSW") - those cities' postings
+  #     all carry ", ON" / ", BC" / ", Canada" markers anyway.
+  #   - bare "remote" is deliberately absent: it would match "Remote US",
+  #     "Remote - India" and every other foreign remote. Canadian remote
+  #     postings say "Remote Canada", "Remote (Canada)", "Remote in
+  #     Canada" or "CA-Remote", which "canada" / "ca-remote" catch.
+  # Known gap: a bare countryless "Remote" is dropped; re-add "remote" here
+  # if those turn out to matter. Accepted false positives: "Waterloo, IA"
+  # and "Vancouver, WA" (one posting each in current data) ride in on the
+  # city names, which are worth keeping for the shorthand-only postings.
+  locations:
+    - canada
+    - ca-remote
+    - can-remote
+    # cities (unambiguous names only, see traps above)
+    - toronto
+    - vancouver
+    - montreal
+    - "montréal"
+    - ottawa
+    - waterloo
+    - kitchener
+    - mississauga
+    - brampton
+    - burnaby
+    - calgary
+    - edmonton
+    - winnipeg
+    - saskatoon
+    # provinces
+    - ontario
+    - quebec
+    - "québec"
+    - alberta
+    - british columbia
+    - saskatchewan
+    - manitoba
+    - nova scotia
+    - new brunswick
+    - newfoundland
+    # province codes, ", xx" comma forms
+    - ", on"
+    - ", bc"
+    - ", ab"
+    - ", qc"
+    - ", mb"
+    - ", sk"
+    - ", nb"
+  # Drop jobs whose posted date is older than this. Aggregator repos backfill
+  # month-old postings that would otherwise alert as "new"; undated jobs pass.
+  max_age_days: 3
+  # More than this many new matches in one run -> one digest message.
+  digest_threshold: 10
+  # Pin the LinkedIn recruiter/manager search links to this region, so a
+  # Canada-only watchlist doesn't surface US recruiters. Supported values
+  # are the keys of GEO_URNS in scraper/notify.py; unset = worldwide.
+  people_location: canada

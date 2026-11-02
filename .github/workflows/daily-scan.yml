@@ -1,0 +1,87 @@
+name: Daily Job Scan
+
+on:
+  schedule:
+    # UTC 01:17 = Asia/Shanghai 09:17; schedules may be delayed.
+    - cron: "17 1 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: hunter-state
+  cancel-in-progress: false
+
+jobs:
+  scan:
+    # Manual runs must also use the default branch, where the ledger lives.
+    if: github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: python -m pip install -r requirements.txt
+
+      - name: Run scan
+        env:
+          GMAIL_ADDRESS: ${{ secrets.GMAIL_ADDRESS }}
+          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+          NOTIFY_TO: ${{ secrets.NOTIFY_TO }}
+        run: >-
+          python -m ingest --sources sources.yaml --db data/seen_jobs.sqlite3
+          --send-email > scan-result.json
+
+      - name: Commit ledger
+        env:
+          LEDGER_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import sqlite3
+          from contextlib import closing
+          from pathlib import Path
+          path = Path("data/seen_jobs.sqlite3")
+          if not path.is_file():
+              raise SystemExit("Ledger missing; refusing to create or commit an empty replacement")
+          with closing(sqlite3.connect(path.resolve().as_uri() + "?mode=ro", uri=True)) as conn:
+              results = conn.execute("PRAGMA integrity_check").fetchall()
+              if results != [("ok",)]:
+                  raise SystemExit(f"Ledger integrity check failed: {results}")
+              conn.execute("SELECT ats, ats_job_id, first_seen, last_seen FROM seen LIMIT 1")
+          PY
+          git config user.name "job-bot"
+          git config user.email "bot@example.com"
+          git add -- data/seen_jobs.sqlite3
+          if git diff --cached --quiet -- data/seen_jobs.sqlite3; then
+            echo "Ledger unchanged; no commit needed."
+          else
+            git commit --only -m "Update job ledger $(date -u +%F)" \
+              -m "Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>" \
+              -- data/seen_jobs.sqlite3
+            # Do not silently drop a rejected push or attempt a binary SQLite merge.
+            git push origin "HEAD:${LEDGER_BRANCH}"
+          fi
+
+      - name: Save scan result and recovery ledger
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: daily-scan-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            scan-result.json
+            data/seen_jobs.sqlite3
+          if-no-files-found: warn
+          retention-days: 7

@@ -1,0 +1,94 @@
+name: Poll job sources
+
+on:
+  # Legacy Telegram/JSON pipeline: manual only; daily-scan owns scheduling.
+  workflow_dispatch:
+
+# Never let two polls run at once: an overlapping run would race the state
+# commit. Queue the newer one instead of cancelling (never-miss rule).
+concurrency:
+  group: hunter-state
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  poll:
+    runs-on: ubuntu-latest
+    # Sources fetch concurrently now, so an iteration takes seconds even
+    # with 200+ sources across Greenhouse/Ashby/Workday/etc. The 4 sleeps of
+    # 5 min dominate: ~20-21 min of loop, plus setup. Timeout kept generous
+    # for a slow/retry-heavy cycle.
+    timeout-minutes: 50
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Poll every 5 minutes and notify
+        # Sources fetch concurrently (scraper/main.py:fetch_all), so an
+        # iteration now takes seconds rather than minutes - the 4 sleeps of
+        # 5 min dominate, giving ~20-21 min of loop per run, plus setup.
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          # State is committed after every iteration, not once at the end:
+          # if a later iteration dies, jobs already notified must stay
+          # recorded or the next run would re-send them.
+          #
+          # Pushes race: despite the concurrency group, GitHub has started a
+          # queued run up to a minute before the previous one finished (and a
+          # manual dispatch alongside a scheduled run), and a textual rebase
+          # of the JSON state then conflicts and used to kill the whole loop.
+          # Instead, union-merge our state with whatever the other run pushed
+          # (a job seen by either side must stay seen) and try again.
+          push_state() {
+            for attempt in 1 2 3; do
+              if git push origin "HEAD:${GITHUB_REF_NAME}"; then
+                return 0
+              fi
+              git fetch origin "${GITHUB_REF_NAME}"
+              git show "origin/${GITHUB_REF_NAME}:seen_jobs.json" > /tmp/theirs_seen.json
+              python -m scraper.merge_seen seen_jobs.json /tmp/theirs_seen.json
+              cp seen_jobs.json /tmp/merged_seen.json
+              # Hard reset, not soft: a soft reset keeps this runner's stale
+              # index, so the retry commit snapshotted the old tree over main
+              # and silently reverted anything merged while the run was live.
+              # Rebuild from main's tree and re-apply only the merged state.
+              git reset --hard "origin/${GITHUB_REF_NAME}"
+              cp /tmp/merged_seen.json seen_jobs.json
+              git add seen_jobs.json
+              git commit -m "Update seen jobs state" || echo "State already on remote."
+            done
+            # Give up but keep looping: the state is committed locally, so at
+            # worst the next run re-sends a few duplicates (never-miss rule).
+            echo "::warning::Push failed 3 times; continuing with local state."
+            return 0
+          }
+          for i in 1 2 3 4 5; do
+            # Pick up state an overlapping run may have pushed while we
+            # slept, so we don't re-notify jobs it already sent. --ff-only
+            # cannot conflict; with unpushed local commits it just refuses,
+            # and push_state reconciles later.
+            git fetch origin "${GITHUB_REF_NAME}"
+            git merge --ff-only FETCH_HEAD || echo "Local commits pending; skipping sync."
+            python -m scraper.main
+            if git diff --quiet seen_jobs.json; then
+              echo "Iteration $i: no state changes."
+            else
+              git add seen_jobs.json
+              git commit -m "Update seen jobs state"
+              push_state
+            fi
+            if [ "$i" -lt 5 ]; then sleep 300; fi
+          done

@@ -1,0 +1,33 @@
+# Local planning docs (kept out of the public repo)
+plan.md
+/stages
+design.md
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+
+# Editors / OS
+.vscode/
+.idea/
+Thumbs.db
+.DS_Store
+
+# Local secrets (never commit; real runs get these from GitHub Secrets)
+.env
+
+# Local ETag cache for the github adapter (absent on CI; safe to delete)
+.etag_cache.json
+
+# Only the daily scan's durable ledger is committed; snapshots/other DBs stay local.
+/data/*.sqlite3
+!/data/seen_jobs.sqlite3
+/data/*.sqlite3-journal
+/data/*.sqlite3-wal
+/data/*.sqlite3-shm
+/data/raw_jobs*.json
+/scan-result.json

@@ -1,0 +1,12 @@
+# Bounded four-provider smoke run; not the full notification watchlist.
+sources:
+  - {type: greenhouse, slug: duolingo, name: Duolingo}
+  - {type: lever, slug: palantir, name: Palantir}
+  - {type: ashby, slug: wealthsimple, name: Wealthsimple}
+  # 21 records exercise two pages; remove max_jobs for the 2000-record safety cap.
+  - type: workday
+    host: paypal.wd1.myworkdayjobs.com
+    tenant: paypal
+    site: jobs
+    name: PayPal
+    max_jobs: 21
