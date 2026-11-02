@@ -79,7 +79,7 @@ sources:
   - {type: greenhouse, company: gusto}
   - {type: greenhouse, company: tripactions}  # Navan, still on its legacy slug
   - {type: ashby, company: airwallex}
-  - {type: greenhouse, company: marqeta}
+  - {type: ashby, company: marqeta-inc, name: Marqeta}
   - {type: ashby, company: moderntreasury}
   - {type: greenhouse, company: lithic}
   - {type: ashby, company: koho}
