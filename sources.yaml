@@ -170,7 +170,7 @@ sources:
   - {type: ashby, company: airbyte}
   - {type: ashby, company: astronomer}
   - {type: ashby, company: zed}
-  - {type: greenhouse, company: postman}
+  # Postman excluded from this target-city watchlist; old Greenhouse board is also 404.
   - {type: greenhouse, company: wizinc}
   - {type: greenhouse, company: chainguard}
   - {type: greenhouse, company: tailscale}  # Toronto HQ

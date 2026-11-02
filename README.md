@@ -66,7 +66,7 @@ existing ledger rather than deleting it just to trigger a test email.
 
 ## Phase 1: raw ATS fetching
 
-The watchlist covers all four ATS providers: 74 Greenhouse,
+The watchlist covers all four ATS providers: 73 Greenhouse,
 4 Lever, 63 Ashby and 58 Workday source entries. This is a configured watchlist,
 not automatic discovery of every company using those providers. The existing
 notification filters target Canada, selected engineering/internship titles and
@@ -294,6 +294,9 @@ to verify four live boards, email and ledger persistence first. Choose `full`
 for the entire watchlist. Scheduled runs always use the full `sources.yaml`.
 The first full cloud run found a 404 for Greenhouse `marqeta`; that source now
 uses Ashby `marqeta-inc`. Other invalid/migrated sources still fail explicitly.
+Postman is excluded from this target-city watchlist rather than repairing its
+obsolete Greenhouse source. The remaining inherited companies have not all been
+audited for current Hong Kong, Shanghai or Shenzhen openings.
 Smoke success does not certify the health of the full watchlist.
 It calls the real entry point, `python -m ingest --sources sources.yaml`,
 not a nonexistent `main.py`.
