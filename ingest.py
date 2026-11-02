@@ -5,6 +5,7 @@ import json
 import logging
 import smtplib
 import sqlite3
+from collections import Counter
 from contextlib import closing
 from dataclasses import asdict
 from datetime import UTC, datetime
@@ -16,6 +17,7 @@ import yaml
 from email_notify import gmail_settings, send_email
 from fetchers import REGISTRY, get_fetcher
 from fetchers._common import object_payload, records
+from job_matching import DEFAULT_RULES, load_filter
 from ledger import DEFAULT_DB, connect, filter_new
 from normalizers import get_normalizer
 from normalizers.models import Job
@@ -67,6 +69,11 @@ def main(argv: list[str] | None = None) -> int:
     source.add_argument("--input", type=Path, help="Replay a previously saved raw JSON snapshot")
     parser.add_argument("--snapshot", type=Path, help="Save full raw batches for exact replay")
     parser.add_argument("--db", type=Path, default=DEFAULT_DB, help="Persistent SQLite seen ledger")
+    rules = parser.add_mutually_exclusive_group()
+    rules.add_argument(
+        "--filters", type=Path, default=DEFAULT_RULES, help="Job matching YAML rules",
+    )
+    rules.add_argument("--no-filters", action="store_true", help="Explicit unfiltered ingestion")
     parser.add_argument(
         "--send-email", action="store_true", help="Email new jobs via Gmail STARTTLS"
     )
@@ -75,6 +82,7 @@ def main(argv: list[str] | None = None) -> int:
         parser.error("--snapshot is only valid with --sources")
     logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
     try:
+        job_filter = None if args.no_filters else load_filter(args.filters)
         if args.send_email:
             gmail_settings()
         if args.sources:
@@ -85,6 +93,14 @@ def main(argv: list[str] | None = None) -> int:
             )
             batches = records(snapshot.get("batches"), str(args.input))
         jobs = normalize_batches(batches)
+        matched: list[Job] = []
+        rejected: Counter[str] = Counter()
+        for job in jobs:
+            reason = job_filter.rejection(job) if job_filter else None
+            if reason:
+                rejected[reason] += 1
+            else:
+                matched.append(job)
         if args.snapshot:
             args.snapshot.parent.mkdir(parents=True, exist_ok=True)
             args.snapshot.write_text(
@@ -92,11 +108,16 @@ def main(argv: list[str] | None = None) -> int:
             )
         with closing(connect(args.db)) as conn:
             new_jobs = filter_new(
-                jobs, conn, datetime.now(UTC), on_new=send_email if args.send_email else None,
+                matched, conn, datetime.now(UTC), on_new=send_email if args.send_email else None,
             )
-        log.info("fetched=%d new=%d db=%s", len(jobs), len(new_jobs), args.db)
+        log.info(
+            "fetched=%d matched=%d rejected=%s new=%d db=%s",
+            len(jobs), len(matched), dict(rejected), len(new_jobs), args.db,
+        )
         print(json.dumps({
             "fetched": len(jobs),
+            "matched": len(matched),
+            "rejected": dict(rejected),
             "new": len(new_jobs),
             "db": str(args.db),
             "jobs": [job_json(job) for job in new_jobs],

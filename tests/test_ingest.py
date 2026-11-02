@@ -9,7 +9,8 @@ from ingest import main
 
 
 def snapshot(path, records=None):
-    records = [{"id": "123", "text": "Engineer", "hostedUrl": "https://jobs.lever.co/acme/123"}] \
+    records = [{"id": "123", "text": "AI Developer", "categories": {"location": "Hong Kong"},
+                "hostedUrl": "https://jobs.lever.co/acme/123"}] \
         if records is None else records
     path.write_text(json.dumps({"batches": [{
         "source": {"type": "lever", "slug": "acme"}, "jobs": records,
@@ -42,7 +43,8 @@ def test_live_fetch_snapshot_and_offline_replay_share_one_ledger(tmp_path, capsy
     )
     responses.get(
         "https://api.lever.co/v0/postings/acme",
-        json=[{"id": "123", "text": "Engineer", "hostedUrl": "https://jobs.lever.co/acme/123",
+        json=[{"id": "123", "text": "AI Developer", "categories": {"location": "Shanghai"},
+               "hostedUrl": "https://jobs.lever.co/acme/123",
                "createdAt": 1793361600000}],
     )
     raw = tmp_path / "raw.json"

@@ -88,7 +88,8 @@ def snapshot(tmp_path):
     path = tmp_path / "raw.json"
     path.write_text(json.dumps({"batches": [{
         "source": {"type": "lever", "slug": "acme"},
-        "jobs": [{"id": "123", "text": "Engineer", "hostedUrl": JOB.apply_url}],
+        "jobs": [{"id": "123", "text": "AI Developer", "categories": {"location": "Shenzhen"},
+                  "hostedUrl": JOB.apply_url}],
     }]}), encoding="utf-8")
     return path
 

@@ -1,0 +1,68 @@
+locations:
+  - hong kong
+  - 香港
+  - shanghai
+  - 上海
+  - shenzhen
+  - 深圳
+
+exclude:
+  - 外包
+  - 派遣
+  - staffing
+  - recruiter
+  - internship program
+  - internship programme
+
+include:
+  - AI
+  - artificial intelligence
+  - machine learning
+  - deep learning
+  - algorithm
+  - algorithms
+  - algorithmic
+  - fresh grad
+  - fresh graduate
+  - fresh graduates
+  - new grad
+  - new graduate
+  - new graduates
+  - graduation
+  - graduate
+  - graduates
+  - developer
+  - developers
+  - development
+  - agent
+  - agents
+  - agentic
+  - llm
+  - llms
+  - large language model
+  - large language models
+  - rag
+  - retrieval augmented generation
+  - harness
+  - tool use
+  - tool calling
+  - function calling
+  - workflow
+  - workflows
+  - planning
+  - embodied
+  - 开发
+  - 应用
+  - 算法
+  - 大模型
+  - 大语言模型
+  - 智能体
+  - 具身
+  - 人工智能
+  - 机器学习
+  - 深度学习
+  - 应届
+  - 毕业生
+  - 工具调用
+  - 工作流
+  - 规划

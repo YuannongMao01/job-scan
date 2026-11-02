@@ -8,13 +8,12 @@ state; no Telegram setup is required for daily email scans.
 ## How it works
 
 ```
-sources.yaml -> FETCH -> NORMALIZE -> SQLITE DEDUP -> GMAIL -> COMMIT LEDGER
-               (raw)     (Job)     (ats, ats_job_id)          (after send)
+sources.yaml -> FETCH -> NORMALIZE -> FILTER -> SQLITE DEDUP -> GMAIL -> COMMIT LEDGER
+               (raw)     (Job)                 (ats, ats_job_id)       (after send)
 ```
 
-Each run emails only jobs not already in `data/seen_jobs.sqlite3`. There is
-currently no relevance-filter stage in this canonical pipeline: the email subject
-says "new jobs", not "matched jobs".
+Each run emails only jobs passing the location/keyword rules and not already in
+`data/seen_jobs.sqlite3`.
 
 ## Setup
 
@@ -205,9 +204,9 @@ python -m ingest --sources ingestion_sources.yaml --snapshot data\raw_jobs.json
 python -m ingest --input data\raw_jobs.json
 ```
 
-With an empty ledger, the first run's `new` count equals its unique job count.
+With an empty ledger, the first run's `new` count equals its unique matched job count.
 The second prints `"new": 0` and `"jobs": []`. Both print a JSON object with
-`fetched`, `new`, `db` and the newly seen canonical `jobs`; dates serialize as
+`fetched`, `matched`, `rejected`, `new`, `db` and the newly seen canonical `jobs`; dates serialize as
 ISO strings or JSON `null`. Counts/warnings/errors go to stderr. You can repeat
 the first live command instead; it also returns zero new jobs unless the actual
 boards have changed in between.
@@ -221,8 +220,8 @@ and only 21 Workday jobs to exercise pagination without fetching hundreds of
 details. The normal Workday safety cap is still 2000.
 
 `--sources sources.yaml` instead polls the full existing watchlist for the four
-supported ATS types, ignoring other types **with warnings**. No title, geography
-or age filters are applied by ingestion. All records must normalize successfully
+supported ATS types, ignoring other types **with warnings**. Location and keyword
+rules are applied by default; no age/seniority filter is added. All records must normalize successfully
 before the batch reaches SQLite; a fetch/normalization/database failure exits
 nonzero, not a success-shaped empty result. Existing ledger rows are never
 automatically pruned or reset.
@@ -240,6 +239,50 @@ This ingestion ledger is independent of the original Telegram `seen_jobs.json`.
 Without `--send-email` it records observations only. With email enabled it commits
 new sightings only after the Gmail digest is accepted. Original Telegram filters
 and JSON state are not used or changed by the canonical pipeline.
+
+## Job matching: Hong Kong, Shanghai and Shenzhen
+
+[job_filters.yaml](job_filters.yaml) is the default rules file for both local
+ingestion/replay and GitHub Actions, including smoke and scheduled scans.
+
+1. The canonical `Job.location` must contain Hong Kong / 香港, Shanghai / 上海,
+   or Shenzhen / 深圳. Multiple locations pass if any target city appears.
+   Unknown locations, bare "China"/"Remote", and cities mentioned only in the JD
+   do not qualify. Only locations preserved by the normalizer are searchable;
+   this does not infer a city from Workday's "2 Locations".
+2. Exclude matches in company, title, department or full JD take priority:
+   外包, 派遣, staffing, recruiter, internship program (also programme).
+   Even incidental mentions such as "no staffing agencies" reject a posting;
+   these are literal exclusion rules, not semantic interpretation.
+3. Require at least one include keyword in title, department or full JD.
+   Company names alone cannot trigger an include. The file contains the requested
+   AI/Algorithm/new-grad/developer/agent/LLM/RAG/harness/tool-use/workflow/planning
+   terms and related artificial intelligence, machine/deep learning, agentic,
+   tool/function calling, embodied and graduate variants.
+
+Matching uses Unicode NFKC, casefolding, whitespace normalization, explicit
+keyword-relevant traditional-to-simplified character mapping (開發/應用/智能體/
+機器學習/大語言模型/應屆畢業生/規劃, etc.), and Chinese substring matching.
+It is a deterministic keyword list, not a general Chinese translation engine or
+LLM classifier. English terms use letter/digit boundaries (`AI` does not match
+`retail`/`detail`, `RAG` does not match `ragtime`); multiword terms accept whitespace
+or hyphens, including `tool-use` and `retrieval-augmented generation`.
+
+The pipeline is **normalize -> filter -> SQLite dedup -> Gmail**. Only matching
+jobs enter the ledger and email; rejected postings can qualify on a future run
+if their content or rules change. Existing historical ledger entries are kept
+and never automatically resent when rules change. No matching unseen jobs means
+no SMTP call. Sending failures still roll back the matched batch.
+
+JSON/logs report `fetched` (before filtering), `matched` (before dedup), `rejected`
+(counts by `location`, `excluded`, `keyword` in that priority order), and `new`
+(matching unseen jobs). A zero-new run need not be zero-matched.
+
+Use `--filters PATH` for a custom rules file, or `--no-filters` to explicitly
+restore unfiltered ingestion. Invalid/missing rules fail rather than silently
+disabling filtering. The raw `python -m fetchers` interface and original legacy
+Telegram filters remain unchanged. No salary, age or seniority restrictions
+were added.
 
 ## Phase 5: daily GitHub Actions scan
 
