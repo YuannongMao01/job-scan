@@ -83,10 +83,12 @@ def test_daily_schedule_permissions_and_no_duplicate_cron():
     assert "schedule" not in legacy["on"]
     assert legacy["concurrency"] == WORKFLOW["concurrency"]
     scan = next(s for s in WORKFLOW["jobs"]["scan"]["steps"] if s.get("name") == "Run scan")
-    assert "--sources sources.yaml" in scan["run"]
+    assert '--sources "$SOURCES_FILE"' in scan["run"]
+    assert "ingestion_sources.yaml" in scan["env"]["SOURCES_FILE"]
+    assert WORKFLOW["on"]["workflow_dispatch"]["inputs"]["scan_scope"]["default"] == "smoke"
     assert "python -m ingest" in scan["run"]
     assert "--send-email" in scan["run"]
-    assert scan["env"] == {
+    assert {key: value for key, value in scan["env"].items() if key != "SOURCES_FILE"} == {
         key: "${{ secrets." + key + " }}"
         for key in ("GMAIL_ADDRESS", "GMAIL_APP_PASSWORD", "NOTIFY_TO")
     }

@@ -246,6 +246,12 @@ and JSON state are not used or changed by the canonical pipeline.
 [daily-scan.yml](.github/workflows/daily-scan.yml) runs at `17 1 * * *`:
 UTC 01:17 / Beijing (Asia/Shanghai) 09:17 every day. It also exposes
 **Actions -> Daily Job Scan -> Run workflow** on the default branch.
+Manual dispatch defaults to `scan_scope: smoke`, using `ingestion_sources.yaml`
+to verify four live boards, email and ledger persistence first. Choose `full`
+for the entire watchlist. Scheduled runs always use the full `sources.yaml`.
+The first full cloud run found a 404 for Greenhouse `marqeta`; full scans fail
+explicitly until invalid/migrated sources are corrected. Smoke success does not
+certify the health of the full watchlist.
 It calls the real entry point, `python -m ingest --sources sources.yaml`,
 not a nonexistent `main.py`.
 

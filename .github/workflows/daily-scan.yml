@@ -5,6 +5,15 @@ on:
     # UTC 01:17 = Asia/Shanghai 09:17; schedules may be delayed.
     - cron: "17 1 * * *"
   workflow_dispatch:
+    inputs:
+      scan_scope:
+        description: "Smoke validates four live boards; full scans the entire watchlist"
+        required: true
+        default: smoke
+        type: choice
+        options:
+          - smoke
+          - full
 
 permissions:
   contents: write
@@ -37,11 +46,12 @@ jobs:
 
       - name: Run scan
         env:
+          SOURCES_FILE: ${{ github.event_name == 'workflow_dispatch' && inputs.scan_scope == 'smoke' && 'ingestion_sources.yaml' || 'sources.yaml' }}
           GMAIL_ADDRESS: ${{ secrets.GMAIL_ADDRESS }}
           GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
           NOTIFY_TO: ${{ secrets.NOTIFY_TO }}
         run: >-
-          python -m ingest --sources sources.yaml --db data/seen_jobs.sqlite3
+          python -m ingest --sources "$SOURCES_FILE" --db data/seen_jobs.sqlite3
           --send-email > scan-result.json
 
       - name: Commit ledger
